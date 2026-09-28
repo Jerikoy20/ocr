@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR System</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            900: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- PDF.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    
+    <!-- Tesseract.js OCR Engine -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    
+    <!-- SheetJS / XLSX Excel Exporter -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.5);
+            border-radius: 4px;
+        }
+        .dropzone-dash {
+            background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='16' ry='16' stroke='%2316A34AFF' stroke-width='3' stroke-dasharray='10%2c 10' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+        }
+        .dark .dropzone-dash {
+            background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='16' ry='16' stroke='%2322C55EFF' stroke-width='3' stroke-dasharray='10%2c 10' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-200 flex flex-col">
+
+    <!-- Navigation Header -->
+    <header class="border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-brand-600 text-white rounded-xl shadow-lg shadow-brand-500/20">
+                    <i class="fa-solid fa-file-excel text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight tracking-tight">OCR PDF to Excel</h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Client-Side Document Text Extraction</p>
+                </div>
+            </div>
+
+            <!-- Header Utilities -->
+            <div class="flex items-center gap-3">
+                <button id="themeToggleBtn" onclick="toggleDarkMode()" class="p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Toggle Dark/Light Mode">
+                    <i id="themeIcon" class="fa-solid fa-moon"></i>
+                </button>
+                <a href="https://github.com/Jerikoy20/ocr.git" target="_blank" rel="noopener noreferrer" class="hidden sm:flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    <i class="fa-brands fa-github text-sm"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-8">
+        
+        <!-- Workflow Progress Steps -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-200/80 dark:border-slate-700/60">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <!-- Step 1 -->
+                <div id="step-1-indicator" class="flex items-center gap-3 p-3 rounded-xl bg-brand-50 dark:bg-brand-900/30 border border-brand-200 dark:border-brand-800 transition-all">
+                    <div id="step-1-badge" class="w-8 h-8 rounded-lg bg-brand-600 text-white font-bold flex items-center justify-center text-sm">1</div>
+                    <div>
+                        <div class="text-xs font-bold uppercase tracking-wider text-brand-700 dark:text-brand-400">Step 1</div>
+                        <div class="text-xs font-medium text-slate-700 dark:text-slate-200">Upload PDF / Image</div>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div id="step-2-indicator" class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 transition-all opacity-60">
+                    <div id="step-2-badge" class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold flex items-center justify-center text-sm">2</div>
+                    <div>
+                        <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Step 2</div>
+                        <div class="text-xs font-medium text-slate-700 dark:text-slate-200">OCR Processing</div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div id="step-3-indicator" class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 transition-all opacity-60">
+                    <div id="step-3-badge" class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold flex items-center justify-center text-sm">3</div>
+                    <div>
+                        <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Step 3</div>
+                        <div class="text-xs font-medium text-slate-700 dark:text-slate-200">Review & Edit</div>
+                    </div>
+                </div>
+
+                <!-- Step 4 -->
+                <div id="step-4-indicator" class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 transition-all opacity-60">
+                    <div id="step-4-badge" class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold flex items-center justify-center text-sm">4</div>
+                    <div>
+                        <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Step 4</div>
+                        <div class="text-xs font-medium text-slate-700 dark:text-slate-200">Export Excel</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 1: File Upload & Settings -->
+        <section id="uploadSection" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Dropzone (Left 2 cols) -->
+            <div class="lg:col-span-2 bg-white dark:bg-slate-800 rounded-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                <div>
+                    <h2 class="text-xl font-bold mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-up text-brand-600"></i>
+                        <span>Upload Scanned Document or Image</span>
+                    </h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">Support for multi-page PDFs, high-res scans, or receipts (PDF, PNG, JPG, JPEG, WEBP).</p>
+                    
+                    <!-- Drag and Drop Box -->
+                    <div id="dropzone" onclick="document.getElementById('fileInput').click()" class="dropzone-dash rounded-2xl p-8 sm:p-12 text-center cursor-pointer hover:bg-brand-50/50 dark:hover:bg-brand-950/20 transition-all group relative">
+                        <input type="file" id="fileInput" accept=".pdf,image/png,image/jpeg,image/jpg,image/webp" class="hidden" onchange="handleFileSelect(event)">
+                        
+                        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-file-pdf"></i>
+                        </div>
+                        <p class="text-base font-semibold text-slate-800 dark:text-slate-200 mb-1">
+                            Drag & drop your document here, or <span class="text-brand-600 dark:text-brand-400 underline">browse</span>
+                        </p>
+                        <p class="text-xs text-slate-400 dark:text-slate-500">Maximum file size: 25MB (Processed entirely in browser for 100% privacy)</p>
+                    </div>
+                </div>
+
+                <!-- Demo / Sample File Button -->
+                <div class="mt-6 pt-6 border-t border-slate-100 dark:border-slate-700/60 flex flex-wrap items-center justify-between gap-4">
+                    <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Don't have a file ready?</span>
+                    <button onclick="loadSampleDocument()" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors">
+                        <i class="fa-solid fa-wand-magic-sparkles text-brand-500"></i>
+                        <span>Generate Sample Invoice PDF Demo</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- OCR Configuration Settings (Right 1 col) -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                <div>
+                    <h3 class="text-base font-bold mb-4 flex items-center gap-2 border-b border-slate-100 dark:border-slate-700 pb-3">
+                        <i class="fa-solid fa-sliders text-slate-500"></i>
+                        <span>OCR Engine Settings</span>
+                    </h3>
+
+                    <!-- Language Selector -->
+                    <div class="mb-5">
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                            Recognition Language
+                        </label>
+                        <select id="languageSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+                            <option value="eng" selected>English (eng)</option>
+                            <option value="spa">Spanish (spa)</option>
+                            <option value="fra">French (fra)</option>
+                            <option value="deu">German (deu)</option>
+                            <option value="tgl">Tagalog / Filipino (tgl)</option>
+                            <option value="zho">Chinese Simplified (zho)</option>
+                            <option value="jpn">Japanese (jpn)</option>
+                        </select>
+                        <p class="text-[11px] text-slate-400 mt-1">Select the main text language for higher accuracy.</p>
+                    </div>
+
+                    <!-- Text-to-Columns Formatting Preference -->
+                    <div class="mb-5">
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                            Excel Column Splitting Strategy
+                        </label>
+                        <select id="delimiterSelect" onchange="updateDelimiterPreference()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+                            <option value="auto" selected>Auto-Detect Table Columns (Recommended)</option>
+                            <option value="space">Split by Multiple Spaces / Tabs</option>
+                            <option value="comma">Split by Comma (,)</option>
+                            <option value="pipe">Split by Pipe (|)</option>
+                            <option value="none">Single Line per Row (No Splitting)</option>
+                        </select>
+                        <p class="text-[11px] text-slate-400 mt-1">Automatically converts space-separated receipt columns into Excel table cells.</p>
+                    </div>
+
+                    <div class="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl text-amber-800 dark:text-amber-300 text-xs leading-relaxed">
+                        <i class="fa-solid fa-lightbulb text-amber-600 dark:text-amber-400 mr-1"></i>
+                        <b>Tip:</b> High contrast scans with 300+ DPI yield the highest character recognition accuracy.
+                    </div>
+                </div>
+
+                <!-- Process Start Button -->
+                <button id="startOcrBtn" disabled onclick="startProcessingPipeline()" class="w-full mt-6 py-3.5 px-4 rounded-xl bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-bold text-sm flex items-center justify-center gap-2 cursor-not-allowed transition-all shadow-md shadow-brand-500/10">
+                    <i class="fa-solid fa-play"></i>
+                    <span>Start OCR Extraction</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- SECTION 2: Live Processing & Page Preview Panel -->
+        <section id="processingSection" class="hidden bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-700 pb-4">
+                <div>
+                    <h2 class="text-lg font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-gears text-brand-600 animate-spin"></i>
+                        <span>OCR Processing in Progress</span>
+                    </h2>
+                    <p id="overallStatusText" class="text-xs text-slate-500 dark:text-slate-400">Initializing PDF page rendering engine...</p>
+                </div>
+                <div class="w-full sm:w-64">
+                    <div class="flex justify-between text-xs font-semibold mb-1">
+                        <span>Total Progress</span>
+                        <span id="overallProgressPercent">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+                        <div id="overallProgressBar" class="bg-brand-600 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page Cards Grid -->
+            <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Document Page Previews</h3>
+                <div id="pageCardsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-[380px] overflow-y-auto custom-scrollbar p-1">
+                    <!-- Page Cards injected via JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3 & 4: Review Data Grid & Export Tools -->
+        <section id="reviewSection" class="hidden flex flex-col gap-6">
+            <!-- Summary Stats Header Bar -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <div class="text-xs font-medium text-slate-500 dark:text-slate-400">Pages Processed</div>
+                    <div id="statPages" class="text-2xl font-bold text-brand-600 dark:text-brand-400">0</div>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <div class="text-xs font-medium text-slate-500 dark:text-slate-400">Total Lines Extracted</div>
+                    <div id="statLines" class="text-2xl font-bold text-slate-800 dark:text-slate-100">0</div>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <div class="text-xs font-medium text-slate-500 dark:text-slate-400">Avg OCR Accuracy</div>
+                    <div id="statAccuracy" class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">0%</div>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <div class="text-xs font-medium text-slate-500 dark:text-slate-400">Detected Columns</div>
+                    <div id="statCols" class="text-2xl font-bold text-sky-600 dark:text-sky-400">1</div>
+                </div>
+            </div>
+
+            <!-- Toolbar & Controls -->
+            <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+                <!-- Search Box -->
+                <div class="relative w-full md:w-72">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-sm"></i>
+                    <input type="text" id="searchInput" oninput="filterTableData()" placeholder="Search extracted text..." class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-4 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+
+                <!-- Editing Utilities -->
+                <div class="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+                    <button onclick="addNewTableRow()" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-colors">
+                        <i class="fa-solid fa-plus text-brand-600"></i>
+                        <span>Add Row</span>
+                    </button>
+                    <button onclick="reapplyDelimiterSplit()" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-colors" title="Re-split text into columns">
+                        <i class="fa-solid fa-table-columns text-sky-500"></i>
+                        <span>Auto-Format Columns</span>
+                    </button>
+                    <button onclick="resetAllData()" class="px-3 py-2 rounded-xl border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs font-bold flex items-center gap-1.5 transition-colors">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span>Start Over</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Spreadsheet Grid Table Container -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto custom-scrollbar max-h-[500px]">
+                    <table id="ocrDataTable" class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-slate-100 dark:bg-slate-900/80 sticky top-0 border-b border-slate-200 dark:border-slate-700 z-10">
+                            <tr id="tableHeaderRow">
+                                <!-- Headers injected via JS -->
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody" class="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                            <!-- Rows injected via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Export Actions Footer Bar -->
+            <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                    <h3 class="font-bold text-sm">Ready for Export</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Download formatted data into spreadsheet applications.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                    <button onclick="copyRawTextToClipboard()" class="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-2 transition-colors">
+                        <i class="fa-regular fa-copy"></i>
+                        <span>Copy Text</span>
+                    </button>
+                    <button onclick="exportToCSV()" class="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-2 transition-colors">
+                        <i class="fa-solid fa-file-csv text-amber-500"></i>
+                        <span>Export CSV</span>
+                    </button>
+                    <button onclick="exportToExcel()" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-brand-500/20 transition-all">
+                        <i class="fa-solid fa-file-excel text-sm"></i>
+                        <span>Download Excel (.xlsx)</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Toast Message Container -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Application Footer -->
+    <footer class="mt-auto border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-4 text-center text-xs text-slate-500 dark:text-slate-400">
+        <p>OCR PDF to Excel Converter • 100% In-Browser Client Processing • Powered by PDF.js, Tesseract.js & SheetJS</p>
+    </footer>
+
+    <script>
+        /* PDF.js Worker setup */
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        /* App State Management */
+        const state = {
+            step: 1,
+            file: null,
+            fileType: null, // 'pdf' or 'image'
+            pages: [], // Array of { pageNum, canvas, dataUrl, status, progress }
+            ocrResults: [], // Array of { id, pageNum, lineNum, rawText, cols: [], confidence }
+            language: 'eng',
+            delimiter: 'auto',
+            detectedMaxCols: 1,
+            filteredResults: []
+        };
+
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const icon = document.getElementById('themeIcon');
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                html.classList.add('light');
+                icon.className = 'fa-solid fa-moon';
+            } else {
+                html.classList.remove('light');
+                html.classList.add('dark');
+                icon.className = 'fa-solid fa-sun text-amber-400';
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            const bgClass = type === 'success' ? 'bg-emerald-600 text-white' :
+                            type === 'error' ? 'bg-rose-600 text-white' :
+                            type === 'warning' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-white';
+
+            toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-xs font-semibold ${bgClass} transition-all duration-300 transform translate-y-2 opacity-0`;
+            toast.innerHTML = `
+                <i class="${type === 'success' ? 'fa-solid fa-circle-check' : type === 'error' ? 'fa-solid fa-circle-xmark' : 'fa-solid fa-circle-info'}"></i>
+                <span>${message}</span>
+            `;
+
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        function updateStepUI(stepNum) {
+            state.step = stepNum;
+            for (let i = 1; i <= 4; i++) {
+                const indicator = document.getElementById(`step-${i}-indicator`);
+                const badge = document.getElementById(`step-${i}-badge`);
+                if (i <= stepNum) {
+                    indicator.classList.remove('opacity-60', 'bg-slate-50', 'dark:bg-slate-800/50');
+                    indicator.classList.add('bg-brand-50', 'dark:bg-brand-900/30', 'border-brand-200', 'dark:border-brand-800');
+                    badge.classList.remove('bg-slate-200', 'dark:bg-slate-700', 'text-slate-600', 'dark:text-slate-300');
+                    badge.classList.add('bg-brand-600', 'text-white');
+                } else {
+                    indicator.classList.add('opacity-60', 'bg-slate-50', 'dark:bg-slate-800/50');
+                    indicator.classList.remove('bg-brand-50', 'dark:bg-brand-900/30', 'border-brand-200', 'dark:border-brand-800');
+                    badge.classList.add('bg-slate-200', 'dark:bg-slate-700', 'text-slate-600', 'dark:text-slate-300');
+                    badge.classList.remove('bg-brand-600', 'text-white');
+                }
+            }
+        }
+
+        const dropzone = document.getElementById('dropzone');
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add('bg-brand-100/50', 'dark:bg-brand-900/40');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove('bg-brand-100/50', 'dark:bg-brand-900/40');
+            });
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                processUploadedFile(files[0]);
+            }
+        });
+
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length > 0) {
+                processUploadedFile(files[0]);
+            }
+        }
+
+        function processUploadedFile(file) {
+            state.file = file;
+            if (file.type === 'application/pdf') {
+                state.fileType = 'pdf';
+            } else if (file.type.startsWith('image/')) {
+                state.fileType = 'image';
+            } else {
+                showToast('Unsupported file type. Please upload a PDF or image file.', 'error');
+                return;
+            }
+
+            const startBtn = document.getElementById('startOcrBtn');
+            startBtn.disabled = false;
+            startBtn.classList.remove('bg-slate-300', 'dark:bg-slate-700', 'text-slate-500', 'dark:text-slate-400', 'cursor-not-allowed');
+            startBtn.classList.add('bg-brand-600', 'hover:bg-brand-700', 'text-white', 'cursor-pointer');
+            
+            showToast(`Loaded: ${file.name} (${(file.size/1024/1024).toFixed(2)} MB)`, 'success');
+        }
+
+        function loadSampleDocument() {
+            // Creates an in-memory canvas simulating a purchase receipt / invoice
+            const canvas = document.createElement('canvas');
+            canvas.width = 800;
+            canvas.height = 1000;
+            const ctx = canvas.getContext('2d');
+
+            // Background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, 800, 1000);
+
+            // Draw header
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 28px Inter, sans-serif';
+            ctx.fillText('METRO TECH SUPPLIES INC.', 50, 70);
+
+            ctx.font = '14px Inter, sans-serif';
+            ctx.fillStyle = '#64748b';
+            ctx.fillText('Invoice #: INV-2026-8891  |  Date: 10/24/2026', 50, 100);
+
+            // Divider
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(50, 120);
+            ctx.lineTo(750, 120);
+            ctx.stroke();
+
+            // Table Header
+            ctx.fillStyle = '#0f172a';
+            ctx.font = 'bold 16px Inter, sans-serif';
+            ctx.fillText('ITEM DESCRIPTION          QTY     UNIT PRICE     TOTAL', 50, 160);
+
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.beginPath();
+            ctx.moveTo(50, 175);
+            ctx.lineTo(750, 175);
+            ctx.stroke();
+
+            // Line items
+            ctx.font = '15px Monospace, sans-serif';
+            ctx.fillStyle = '#334155';
+            
+            const items = [
+                'Logitech MX Master 3S         2       $99.99       $199.98',
+                'Dell UltraSharp 27 4K        1       $450.00      $450.00',
+                'Keychron K2 Mechanical       1       $89.00       $89.00',
+                'USB-C Multiport Hub           3       $29.50       $88.50',
+                'Ergonomic Desk Mat           2       $24.00       $48.00'
+            ];
+
+            items.forEach((item, idx) => {
+                ctx.fillText(item, 50, 210 + (idx * 35));
+            });
+
+            // Total Divider
+            ctx.beginPath();
+            ctx.moveTo(50, 400);
+            ctx.lineTo(750, 400);
+            ctx.stroke();
+
+            ctx.font = 'bold 18px Inter, sans-serif';
+            ctx.fillStyle = '#16a34a';
+            ctx.fillText('SUBTOTAL:                                         $875.48', 50, 440);
+            ctx.fillText('TAX (8%):                                         $70.04', 50, 470);
+            ctx.fillText('GRAND TOTAL:                                      $945.52', 50, 500);
+
+            canvas.toBlob((blob) => {
+                const sampleFile = new File([blob], "sample_receipt_invoice.png", { type: "image/png" });
+                processUploadedFile(sampleFile);
+                showToast("Sample Invoice PDF generated! Click 'Start OCR Extraction' to test.", "info");
+            });
+        }
+
+        async function startProcessingPipeline() {
+            if (!state.file) return;
+
+            // Update UI State
+            updateStepUI(2);
+            document.getElementById('uploadSection').classList.add('hidden');
+            document.getElementById('processingSection').classList.remove('hidden');
+
+            state.language = document.getElementById('languageSelect').value;
+            state.delimiter = document.getElementById('delimiterSelect').value;
+            state.pages = [];
+            state.ocrResults = [];
+
+            const grid = document.getElementById('pageCardsGrid');
+            grid.innerHTML = '';
+
+            try {
+                if (state.fileType === 'pdf') {
+                    await renderPDFPages();
+                } else {
+                    await renderImagePage();
+                }
+
+                await runTesseractOCR();
+                
+                // Complete processing
+                updateStepUI(3);
+                document.getElementById('processingSection').classList.add('hidden');
+                document.getElementById('reviewSection').classList.remove('hidden');
+
+                processAndRenderDataTable();
+                showToast('OCR extraction completed successfully!', 'success');
+
+            } catch (err) {
+                console.error(err);
+                showToast('An error occurred during OCR extraction: ' + err.message, 'error');
+            }
+        }
+
+        async function renderPDFPages() {
+            updateStatus('Reading PDF document structure...', 10);
+            const arrayBuffer = await state.file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            
+            const totalPages = pdf.numPages;
+            const grid = document.getElementById('pageCardsGrid');
+
+            for (let i = 1; i <= totalPages; i++) {
+                updateStatus(`Rendering PDF Page ${i} of ${totalPages}...`, Math.round((i / totalPages) * 30));
+                const page = await pdf.getPage(i);
+                
+                // Scale 2.0 for higher clarity OCR
+                const viewport = page.getViewport({ scale: 2.0 });
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+
+                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+                const dataUrl = canvas.toDataURL('image/png');
+
+                state.pages.push({
+                    pageNum: i,
+                    canvas: canvas,
+                    dataUrl: dataUrl,
+                    status: 'Pending',
+                    progress: 0
+                });
+
+                // Create page card UI
+                const card = createPageCardUI(i, dataUrl);
+                grid.appendChild(card);
+            }
+        }
+
+        async function renderImagePage() {
+            updateStatus('Loading image file...', 15);
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+
+                        state.pages.push({
+                            pageNum: 1,
+                            canvas: canvas,
+                            dataUrl: e.target.result,
+                            status: 'Pending',
+                            progress: 0
+                        });
+
+                        const grid = document.getElementById('pageCardsGrid');
+                        grid.appendChild(createPageCardUI(1, e.target.result));
+                        resolve();
+                    };
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(state.file);
+            });
+        }
+
+        function createPageCardUI(pageNum, dataUrl) {
+            const card = document.createElement('div');
+            card.id = `pageCard-${pageNum}`;
+            card.className = 'bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 flex flex-col gap-2 relative group';
+            card.innerHTML = `
+                <div class="aspect-[3/4] bg-slate-200 dark:bg-slate-800 rounded-lg overflow-hidden relative">
+                    <img src="${dataUrl}" class="w-full h-full object-contain" alt="Page ${pageNum}">
+                    <span id="pageBadge-${pageNum}" class="absolute top-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800/80 text-white backdrop-blur-sm">
+                        Pending
+                    </span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold">Page ${pageNum}</span>
+                    <span id="pagePercent-${pageNum}" class="text-slate-400 font-mono text-[11px]">0%</span>
+                </div>
+                <div class="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                    <div id="pageProgress-${pageNum}" class="bg-brand-600 h-full w-0 transition-all duration-200"></div>
+                </div>
+            `;
+            return card;
+        }
+
+        function updateStatus(text, percent) {
+            document.getElementById('overallStatusText').innerText = text;
+            document.getElementById('overallProgressPercent').innerText = `${percent}%`;
+            document.getElementById('overallProgressBar').style.width = `${percent}%`;
+        }
+
+        async function runTesseractOCR() {
+            const worker = await Tesseract.createWorker(state.language);
+
+            const totalPages = state.pages.length;
+
+            for (let i = 0; i < totalPages; i++) {
+                const page = state.pages[i];
+                const pageNum = page.pageNum;
+
+                // Update card status
+                document.getElementById(`pageBadge-${pageNum}`).className = 'absolute top-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500 text-white';
+                document.getElementById(`pageBadge-${pageNum}`).innerText = 'OCR Processing...';
+
+                updateStatus(`Recognizing text on Page ${pageNum} of ${totalPages}...`, 30 + Math.round((i / totalPages) * 65));
+
+                const result = await worker.recognize(page.canvas, {
+                    rotateAuto: true
+                });
+
+                // Extract lines with confidence scores
+                if (result.data && result.data.lines) {
+                    result.data.lines.forEach((line, lineIdx) => {
+                        const cleanText = line.text.trim();
+                        if (cleanText.length > 0) {
+                            state.ocrResults.push({
+                                id: `res-${pageNum}-${lineIdx}-${Math.random().toString(36).substring(2,6)}`,
+                                pageNum: pageNum,
+                                lineNum: lineIdx + 1,
+                                rawText: cleanText,
+                                confidence: Math.round(line.confidence || 85),
+                                cols: []
+                            });
+                        }
+                    });
+                }
+
+                // Update page card completed status
+                document.getElementById(`pageBadge-${pageNum}`).className = 'absolute top-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-600 text-white';
+                document.getElementById(`pageBadge-${pageNum}`).innerText = 'Completed';
+                document.getElementById(`pageProgress-${pageNum}`).style.width = '100%';
+                document.getElementById(`pagePercent-${pageNum}`).innerText = '100%';
+            }
+
+            await worker.terminate();
+            updateStatus('Finalizing extracted text tables...', 100);
+        }
+
+        function updateDelimiterPreference() {
+            state.delimiter = document.getElementById('delimiterSelect').value;
+            if (state.ocrResults.length > 0) {
+                processAndRenderDataTable();
+            }
+        }
+
+        function reapplyDelimiterSplit() {
+            processAndRenderDataTable();
+            showToast('Table auto-formatted into structured columns!', 'info');
+        }
+
+        function processAndRenderDataTable() {
+            let maxCols = 1;
+
+            // Process text to columns based on delimiter setting
+            state.ocrResults.forEach(row => {
+                let parts = [];
+                const text = row.rawText;
+
+                if (state.delimiter === 'none') {
+                    parts = [text];
+                } else if (state.delimiter === 'comma') {
+                    parts = text.split(',').map(s => s.trim());
+                } else if (state.delimiter === 'pipe') {
+                    parts = text.split('|').map(s => s.trim());
+                } else if (state.delimiter === 'space') {
+                    parts = text.split(/\s{2,}/).map(s => s.trim());
+                } else {
+                    // Auto-detect mode: splits on 2+ spaces, tabs, or pipes
+                    parts = text.split(/\s{2,}|\t|\|/).map(s => s.trim()).filter(s => s.length > 0);
+                }
+
+                if (parts.length === 0) parts = [text];
+                row.cols = parts;
+                if (parts.length > maxCols) maxCols = parts.length;
+            });
+
+            state.detectedMaxCols = maxCols;
+            state.filteredResults = [...state.ocrResults];
+
+            updateSummaryStats();
+            renderTableGrid();
+        }
+
+        function updateSummaryStats() {
+            document.getElementById('statPages').innerText = state.pages.length;
+            document.getElementById('statLines').innerText = state.ocrResults.length;
+            
+            const totalConf = state.ocrResults.reduce((acc, curr) => acc + curr.confidence, 0);
+            const avgConf = state.ocrResults.length ? Math.round(totalConf / state.ocrResults.length) : 0;
+            
+            const confEl = document.getElementById('statAccuracy');
+            confEl.innerText = `${avgConf}%`;
+            confEl.className = `text-2xl font-bold ${avgConf >= 80 ? 'text-emerald-500' : avgConf >= 60 ? 'text-amber-500' : 'text-rose-500'}`;
+            
+            document.getElementById('statCols').innerText = state.detectedMaxCols;
+        }
+
+        function renderTableGrid() {
+            const headerRow = document.getElementById('tableHeaderRow');
+            const tbody = document.getElementById('tableBody');
+
+            // Build dynamic table headers
+            let headerHTML = `
+                <th class="p-3 w-12 text-center text-slate-400">#</th>
+                <th class="p-3 w-16 text-center text-slate-400">Page</th>
+            `;
+
+            for (let c = 1; c <= state.detectedMaxCols; c++) {
+                headerHTML += `<th class="p-3 min-w-[140px] text-slate-600 dark:text-slate-300 font-bold">Column ${c}</th>`;
+            }
+
+            headerHTML += `
+                <th class="p-3 w-24 text-center text-slate-400">Accuracy</th>
+                <th class="p-3 w-16 text-center text-slate-400">Actions</th>
+            `;
+            headerRow.innerHTML = headerHTML;
+
+            // Render Rows
+            tbody.innerHTML = '';
+
+            if (state.filteredResults.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="${state.detectedMaxCols + 4}" class="p-8 text-center text-slate-400 italic font-sans">
+                            No matching text found.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            state.filteredResults.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group';
+
+                let colsHTML = '';
+                for (let c = 0; c < state.detectedMaxCols; c++) {
+                    const val = item.cols[c] !== undefined ? item.cols[c] : '';
+                    colsHTML += `
+                        <td class="p-2 border-r border-slate-100 dark:border-slate-800">
+                            <input type="text" value="${escapeHtml(val)}" onchange="updateCellData('${item.id}', ${c}, this.value)" class="w-full bg-transparent px-2 py-1 rounded outline-none focus:bg-white dark:focus:bg-slate-900 focus:ring-1 focus:ring-brand-500 text-slate-800 dark:text-slate-200">
+                        </td>
+                    `;
+                }
+
+                const confBadge = item.confidence >= 80 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
+                                  item.confidence >= 60 ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' :
+                                  'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300';
+
+                tr.innerHTML = `
+                    <td class="p-3 text-center text-slate-400 font-sans text-[11px]">${index + 1}</td>
+                    <td class="p-3 text-center text-slate-500 font-sans text-[11px]">${item.pageNum}</td>
+                    ${colsHTML}
+                    <td class="p-3 text-center font-sans">
+                        <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold ${confBadge}">
+                            ${item.confidence}%
+                        </span>
+                    </td>
+                    <td class="p-3 text-center font-sans">
+                        <button onclick="deleteRow('${item.id}')" class="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors p-1" title="Delete Row">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/"/g, '&quot;');
+        }
+
+        function updateCellData(id, colIndex, value) {
+            const target = state.ocrResults.find(r => r.id === id);
+            if (target) {
+                target.cols[colIndex] = value;
+                // Update raw string reconstruction
+                target.rawText = target.cols.join(' ');
+            }
+        }
+
+        function deleteRow(id) {
+            state.ocrResults = state.ocrResults.filter(r => r.id !== id);
+            state.filteredResults = state.filteredResults.filter(r => r.id !== id);
+            updateSummaryStats();
+            renderTableGrid();
+            showToast('Row deleted', 'info');
+        }
+
+        function addNewTableRow() {
+            const newId = `res-custom-${Math.random().toString(36).substring(2,6)}`;
+            const newRow = {
+                id: newId,
+                pageNum: 1,
+                lineNum: state.ocrResults.length + 1,
+                rawText: 'New Editable Row',
+                confidence: 100,
+                cols: Array(state.detectedMaxCols).fill('')
+            };
+            newRow.cols[0] = 'New Editable Row';
+
+            state.ocrResults.push(newRow);
+            state.filteredResults.push(newRow);
+            updateSummaryStats();
+            renderTableGrid();
+            showToast('New row added to table', 'success');
+        }
+
+        function filterTableData() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            if (!query) {
+                state.filteredResults = [...state.ocrResults];
+            } else {
+                state.filteredResults = state.ocrResults.filter(r => 
+                    r.rawText.toLowerCase().includes(query) ||
+                    r.cols.some(c => c.toLowerCase().includes(query))
+                );
+            }
+            renderTableGrid();
+        }
+
+        function resetAllData() {
+            if (confirm('Are you sure you want to reset and start over?')) {
+                state.file = null;
+                state.pages = [];
+                state.ocrResults = [];
+                state.filteredResults = [];
+
+                updateStepUI(1);
+                document.getElementById('reviewSection').classList.add('hidden');
+                document.getElementById('processingSection').classList.add('hidden');
+                document.getElementById('uploadSection').classList.remove('hidden');
+
+                document.getElementById('fileInput').value = '';
+                const startBtn = document.getElementById('startOcrBtn');
+                startBtn.disabled = true;
+                startBtn.className = 'w-full mt-6 py-3.5 px-4 rounded-xl bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-bold text-sm flex items-center justify-center gap-2 cursor-not-allowed transition-all';
+                
+                showToast('System reset ready for new upload', 'info');
+            }
+        }
+
+        function exportToExcel() {
+            if (state.ocrResults.length === 0) {
+                showToast('No data available to export.', 'warning');
+                return;
+            }
+
+            // Construct 2D array matrix for Excel sheet
+            const sheetData = [];
+            
+            // Header Row
+            const headers = ['Page #'];
+            for (let c = 1; c <= state.detectedMaxCols; c++) {
+                headers.push(`Column ${c}`);
+            }
+            headers.push('OCR Confidence');
+            sheetData.push(headers);
+
+            // Row Data
+            state.ocrResults.forEach(r => {
+                const row = [r.pageNum];
+                for (let c = 0; c < state.detectedMaxCols; c++) {
+                    row.push(r.cols[c] || '');
+                }
+                row.push(`${r.confidence}%`);
+                sheetData.push(row);
+            });
+
+            // SheetJS workbook creation
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+            // Adjust column widths automatically
+            const colWidths = headers.map((h, i) => {
+                let maxLen = h.length;
+                sheetData.forEach(row => {
+                    const cellVal = String(row[i] || '');
+                    if (cellVal.length > maxLen) maxLen = cellVal.length;
+                });
+                return { wch: Math.min(Math.max(maxLen + 3, 10), 50) };
+            });
+            ws['!cols'] = colWidths;
+
+            XLSX.utils.book_append_sheet(wb, ws, "OCR Extracted Data");
+
+            const fileName = state.file ? state.file.name.replace(/\.[^/.]+$/, "") + "_extracted.xlsx" : "OCR_Extracted_Data.xlsx";
+            XLSX.writeFile(wb, fileName);
+
+            showToast('Excel spreadsheet downloaded successfully!', 'success');
+        }
+
+        function exportToCSV() {
+            if (state.ocrResults.length === 0) return;
+
+            const rows = [];
+            state.ocrResults.forEach(r => {
+                const escapedCols = r.cols.map(c => `"${(c || '').replace(/"/g, '""')}"`);
+                rows.push([r.pageNum, ...escapedCols].join(','));
+            });
+
+            const csvContent = "data:text/csv;charset=utf-8," + rows.join("\n");
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "OCR_Extracted_Data.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            showToast('CSV file downloaded!', 'success');
+        }
+
+        function copyRawTextToClipboard() {
+            if (state.ocrResults.length === 0) return;
+
+            const fullText = state.ocrResults.map(r => r.cols.join('\t')).join('\n');
+            
+            // Clipboard fallback for frame security
+            const textarea = document.createElement('textarea');
+            textarea.value = fullText;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+
+            showToast('Extracted text copied to clipboard!', 'success');
+        }
+    </script>
+</body>
+</html>
